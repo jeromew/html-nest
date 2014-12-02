@@ -7,6 +7,18 @@ Apply the HTML5 Tree Construction algorithm to a stream of `html-tokenize` token
 
 # Example
 
+Simply pipe the output of `html-tokenize` into an `html-nest` stream.
+
+```js
+var tokenize = require('html-tokenize');
+var nest = require('html-nest');
+
+htmlStream
+  .pipe(tokenize())
+  .pipe(nest())
+  ..
+```
+
 # Specification
 
 The whatwg detailed specification of the Tree Construction algorithm can be found on https://html.spec.whatwg.org/multipage/syntax.html#tree-construction
@@ -21,7 +33,7 @@ Currenly only a subset of the Tree Construction algorithm is implemented. The ar
 
 Feel free to send PRs, either for new tests or for implementation of missing parts.
 
-# Notes regarding the implementation of the Tree Construction algorithm
+# Notes regarding the implementation
 
 There are some aspects of the Tree Construction algorithm to do not fit well with the streaming approach taken by `html-tokenize` and `html-nest`. We will try and express these limitations here:
 
