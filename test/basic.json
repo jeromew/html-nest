@@ -1,0 +1,28 @@
+{
+"standard": {
+"input": [
+   [ "open",  "<html>"  ]
+  ,[ "open",  "<head>"  ]
+  ,[ "open",  "<script>"  ]
+  ,[ "text",  "script"  ]
+  ,[ "close", "</script>" ]
+  ,[ "close", "</head>" ]
+  ,[ "open",  "<body>"  ]
+  ,[ "text",  "text"  ]
+  ,[ "close", "</body>" ]
+  ,[ "close", "</html>" ]
+],
+"output": [
+   [ "open",  "<html>"  ]
+  ,[ "open",  "<head>"  ]
+  ,[ "open",  "<script>"  ]
+  ,[ "text",  "script"  ]
+  ,[ "close", "</script>" ]
+  ,[ "close", "</head>" ]
+  ,[ "open",  "<body>"  ]
+  ,[ "text",  "text"  ]
+  ,[ "close", "</body>" ]
+  ,[ "close", "</html>" ]
+]}
+}
+

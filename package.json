@@ -1,0 +1,31 @@
+{
+  "name": "html-nest",
+  "version": "1.0.0",
+  "description": "The goal of this module is to apply as much as possible of the HTML5 Tree Construction algorithm (https://html.spec.whatwg.org/multipage/syntax.html#tree-construction) to a stream of tokens coming from `html-tokenize`. `html-tokenize` works very well on documents that are properly nested, but it can produce unbalanced tags if the original document has mis-nested tags. The Tree Construction algorithm was specified to allow HTML5 browsers to bypass parsing errors, and build a balanced tree out of any document that 'looks' like an HTML5 document. This module adapts the output of `html-tokenize` with the same algorithm.",
+  "main": "index.js",
+  "scripts": {
+    "test": "tape test/*.js"
+  },
+  "author": "Jérôme Wagner <jerome.wagner@m4x.org>",
+  "license": "MIT",
+  "dependencies": {
+    "inherits": "^2.0.1",
+    "readable-stream": "^1.0.33",
+    "through2": "^0.6.3"
+  },
+  "devDependencies": {
+    "glob": "^4.3.1",
+    "tape": "~2.12.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/jeromew/html-nest.git"
+  },
+  "homepage": "https://github.com/jeromew/html-nest",
+  "keywords": [
+    "html",
+    "html5",
+    "parser",
+    "stream"
+  ]
+}

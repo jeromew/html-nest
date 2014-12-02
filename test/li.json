@@ -1,0 +1,36 @@
+{
+"in_body - <li> closes pending <li>s": {
+"input": [
+   [ "open",  "<html>"  ]
+  ,[ "open",  "<head>"  ]
+  ,[ "close", "</head>" ]
+  ,[ "open",  "<body>"  ]
+  ,[ "open", "<li>" ]
+  ,[ "text", "li1" ]
+  ,[ "open", "<li>" ]
+  ,[ "text", "li2" ]
+  ,[ "open", "<li>" ]
+  ,[ "text", "li3" ]
+  ,[ "close", "</li>" ]
+  ,[ "close", "</body>" ]
+  ,[ "close", "</html>" ]
+],
+"output": [
+   [ "open",  "<html>"  ]
+  ,[ "open",  "<head>"  ]
+  ,[ "close", "</head>" ]
+  ,[ "open",  "<body>"  ]
+  ,[ "open", "<li>" ]
+  ,[ "text", "li1" ]
+  ,[ "close", "</li>" ]
+  ,[ "open", "<li>" ]
+  ,[ "text", "li2" ]
+  ,[ "close", "</li>" ]
+  ,[ "open", "<li>" ]
+  ,[ "text", "li3" ]
+  ,[ "close", "</li>" ]
+  ,[ "close", "</body>" ]
+  ,[ "close", "</html>" ] 
+]}
+}
+

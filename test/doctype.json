@@ -1,0 +1,35 @@
+{
+"copy/pasted html document": {
+"input": [
+   [ "open",  "<html>"  ]
+  ,[ "open",  "<head>"  ]
+  ,[ "close", "</head>" ]
+  ,[ "open",  "<body>"  ]
+  ,[ "open",  "<!doctype>"]
+  ,[ "open",  "<html>"  ]
+  ,[ "open",  "<head>"  ]
+  ,[ "close", "</head>" ]
+  ,[ "open",  "<body>"  ]
+  ,[ "open",  "<div>"   ]
+  ,[ "close",  "</div>" ]
+  ,[ "close", "</body>" ]
+  ,[ "close", "</html>" ]
+  ,[ "open",  "<div>"   ]
+  ,[ "close",  "</div>" ]
+  ,[ "close", "</body>" ]
+  ,[ "close", "</html>" ]
+],
+"output": [
+   [ "open",  "<html>"  ]
+  ,[ "open",  "<head>"  ]
+  ,[ "close", "</head>" ]
+  ,[ "open",  "<body>"  ]
+  ,[ "open",  "<div>"   ]
+  ,[ "close", "</div>"  ]
+  ,[ "open",  "<div>"   ]
+  ,[ "close", "</div>"  ]
+  ,[ "close", "</body>" ]
+  ,[ "close", "</html>" ]
+]}
+}
+

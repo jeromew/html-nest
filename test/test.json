@@ -1,0 +1,88 @@
+{
+"missing html": {
+"input": [
+   [ "open",  "<head>"  ]
+  ,[ "close", "</head>" ]
+  ,[ "open",  "<body>"  ]
+  ,[ "open",  "<div>"   ]
+  ,[ "close",  "</div>" ]
+  ,[ "close", "</body>" ]
+],
+"output": [
+   [ "open",  "<html>"  ]
+  ,[ "open",  "<head>"  ]
+  ,[ "close", "</head>" ]
+  ,[ "open",  "<body>"  ]
+  ,[ "open",  "<div>"   ]
+  ,[ "close", "</div>"  ]
+  ,[ "close", "</body>" ]
+  ,[ "close", "</html>" ]
+]},
+"script only": {
+"input": [
+   [ "open",  "<script>"  ]
+  ,[ "close", "</script>" ]
+],
+"output": [
+   [ "open",  "<html>"  ]
+  ,[ "open",  "<head>"  ]
+  ,[ "open",  "<script>"  ]
+  ,[ "close", "</script>" ]
+  ,[ "close", "</head>" ]
+  ,[ "open",  "<body>"  ]
+  ,[ "close", "</body>" ]
+  ,[ "close", "</html>" ]
+]},
+"ul - not closed": {
+"input": [
+   [ "open",  "<html>"  ]
+  ,[ "open",  "<head>"  ]
+  ,[ "close", "</head>" ]
+  ,[ "open",  "<body>"  ]
+  ,[ "open",  "<div>"   ]
+  ,[ "open",  "<ul>"    ]
+  ,[ "close", "</div>"  ]
+  ,[ "open",  "<div>"   ]
+  ,[ "close", "</div>"  ]
+  ,[ "close", "</body>" ]
+  ,[ "close", "</html>" ]
+],
+"output": [
+   [ "open",  "<html>"  ]
+  ,[ "open",  "<head>"  ]
+  ,[ "close", "</head>" ]
+  ,[ "open",  "<body>"  ]
+  ,[ "open",  "<div>"   ]
+  ,[ "open",  "<ul>"    ]
+  ,[ "close", "</ul>"   ]
+  ,[ "close", "</div>"  ]
+  ,[ "open",  "<div>"   ]
+  ,[ "close", "</div>"  ]
+  ,[ "close", "</body>" ]
+  ,[ "close", "</html>" ]
+]},
+"closing - missing divs": {
+"input": [
+   [ "open",  "<html>"  ]
+  ,[ "open",  "<head>"  ]
+  ,[ "close", "</head>" ]
+  ,[ "open",  "<body>"  ]
+  ,[ "open",  "<div>"   ]
+  ,[ "open",  "<div>"   ]
+  ,[ "close", "</body>" ]
+  ,[ "close", "</html>" ]
+],
+"output": [
+   [ "open",  "<html>"  ]
+  ,[ "open",  "<head>"  ]
+  ,[ "close", "</head>" ]
+  ,[ "open",  "<body>"  ]
+  ,[ "open",  "<div>"   ]
+  ,[ "open",  "<div>"    ]
+  ,[ "close", "</div>"   ]
+  ,[ "close", "</div>"  ]
+  ,[ "close", "</body>" ]
+  ,[ "close", "</html>" ]
+]}
+}
+
