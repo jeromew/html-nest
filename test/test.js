@@ -24,7 +24,7 @@ for(var name in suite) {
           var exp = io.output.shift();
           //console.log('actual', row[0], row[1].toString());
           t.equal(row[0], exp[0]);
-          t.equal(row[1].toString(), exp[1]);
+          t.equal(row[1].toString(), exp[1], row[1].toString() + ' <-> ' + exp[1]);
           next();
         }))
         var token;
