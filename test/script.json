@@ -1,0 +1,26 @@
+{
+"script data": {
+"input": [
+   [ "open",  "<html>"  ]
+  ,[ "open",  "<head>"  ]
+  ,[ "open",  "<script>"  ]
+  ,[ "text",  "script a"  ]
+  ,[ "close", "</script>" ]
+  ,[ "close", "</head>" ]
+  ,[ "open",  "<body>"  ]
+  ,[ "close", "</body>" ]
+  ,[ "close", "</html>" ]
+],
+"output": [
+   [ "open",  "<html>"  ]
+  ,[ "open",  "<head>"  ]
+  ,[ "open",  "<script>" ]
+  ,[ "text",  "script a" ]
+  ,[ "close", "</script>"]
+  ,[ "close", "</head>" ]
+  ,[ "open",  "<body>"  ]
+  ,[ "close", "</body>" ]
+  ,[ "close", "</html>" ]
+]}
+}
+

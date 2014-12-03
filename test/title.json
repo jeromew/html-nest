@@ -1,0 +1,26 @@
+{
+"title data": {
+"input": [
+   [ "open",  "<html>"  ]
+  ,[ "open",  "<head>"  ]
+  ,[ "open",  "<title>"  ]
+  ,[ "text",  "a title"  ]
+  ,[ "close", "</title>" ]
+  ,[ "close", "</head>" ]
+  ,[ "open",  "<body>"  ]
+  ,[ "close", "</body>" ]
+  ,[ "close", "</html>" ]
+],
+"output": [
+   [ "open",  "<html>"  ]
+  ,[ "open",  "<head>"  ]
+  ,[ "open",  "<title>" ]
+  ,[ "text",  "a title" ]
+  ,[ "close", "</title>"]
+  ,[ "close", "</head>" ]
+  ,[ "open",  "<body>"  ]
+  ,[ "close", "</body>" ]
+  ,[ "close", "</html>" ]
+]}
+}
+

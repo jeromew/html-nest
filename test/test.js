@@ -22,6 +22,7 @@ for(var name in suite) {
         var n = nest();
         n.pipe(through.obj(function(row, _, next) {
           var exp = io.output.shift();
+          //console.log('actual', row[0], row[1].toString());
           t.equal(row[0], exp[0]);
           t.equal(row[1].toString(), exp[1]);
           next();
