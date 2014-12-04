@@ -1,5 +1,6 @@
 var Transform = require('readable-stream').Transform;
 var inherits = require('inherits');
+var parse_tag = require('./parse_tag.js')
 
 inherits(Nest, Transform);
 module.exports = Nest;
@@ -50,9 +51,10 @@ var tags = {
 }
 
 
-function Nest () {
-    if (!(this instanceof Nest)) return new Nest;
+function Nest (opts) {
+    if (!(this instanceof Nest)) return new Nest(opts);
     Transform.call(this);
+    this.opts = opts || {};
     this._writableState.objectMode = true;
     this._readableState.objectMode = true;
     this.insertion_mode = 'initial';
@@ -71,6 +73,7 @@ function Nest () {
     this.foster_head_buffer = null;
 
     this.foster_parenting = false;
+    this.foster_parenting_sidx = null;
     this.foster_table_buffer = null;
 
     // an internal buffer is used to buffer tokens
@@ -78,6 +81,15 @@ function Nest () {
     // is not empty
     this.buffer = [];
     this.seqs = [ this.buffer ];
+
+    this.fragment_case = false;
+
+    if (this.opts.context) {
+      this.fragment_case = true;
+      this.stack.push(this.opts.context);
+      this.reset_the_insertion_mode_appropriately();
+    }
+
 }
 
 /**
@@ -234,6 +246,7 @@ Nest.prototype.process_in_head = function(name, token) {
   }
   else if (token[0] === 'open'
   && name === 'title') {
+    this.stack.push(name);
     this.enqueue(name, token);
     this.insertion_mode_saved = this.insertion_mode;
     this.insertion_mode = 'text';
@@ -348,6 +361,7 @@ Nest.prototype.disable_foster_head = function() {
 // https://html.spec.whatwg.org/multipage/syntax.html#parsing-main-inbody
 Nest.prototype.process_in_body = function(name, token) {
   var idx, node, current_node, state;
+  var tag, attrs;
   // Any other character token
   if (token[0] === 'text') {
     // Reconstruct the active formatting elements, if any.
@@ -490,12 +504,18 @@ Nest.prototype.process_in_body = function(name, token) {
     // Insert an HTML element for the token.
     // Immediately pop the current node off the stack of open elements.
     this.enqueue(name, token);
+    
     // Acknowledge the token's self-closing flag, if it is set.
+    
     // If the token does not have an attribute with the name "type",
     // or if it does, but that attribute's value is not
     // an ASCII case-insensitive match for the string "hidden",
     // then: set the frameset-ok flag to "not ok".
-    // TODO
+    tag = parse_tag(token[1]);
+    attrs = tag.getAttributes()
+    if (attrs.type === undefined || attrs.type.toLowerCase() !== 'hidden') {
+      this.frameset_ok = 'not ok';
+    }
   }
   // A start tag whose tag name is "select"
   else if (token[0] === 'open'
@@ -538,7 +558,7 @@ Nest.prototype.process_in_body = function(name, token) {
 
 // https://html.spec.whatwg.org/multipage/syntax.html#parsing-main-intable
 Nest.prototype.process_in_table = function(name, token) {
-  var current_node, t;
+  var current_node, t, tag, attrs;
   current_node = this.stack[this.stack.length - 1];
   // A character token, if the current node is table, tbody, tfoot, thead, or tr element
   if (token[0] === 'text'
@@ -684,12 +704,17 @@ Nest.prototype.process_in_table = function(name, token) {
     // but that attribute's value is not an ASCII case-insensitive match
     // for the string "hidden", then: act as described in the "anything else" entry below.
 
-    // TODO: implement get attribute here
-    // TODO: implement form handling
+    tag = parse_tag(token[1]);
+    attrs = tag.getAttributes()
+    if (attrs.type === undefined || attrs.type.toLowerCase() !== 'hidden') {
+      return this.process_in_table_anything_else(name, token);
+    }
     
     // Otherwise:
     // Insert an HTML element for the token, and set the form element pointer to point to the element created.
     // Pop that form element off the stack of open elements.
+    this.enqueue(name, token);
+    this.form_element_pointer = true;
   }
   // A start tag whose tag name is "form"
   else if (token[0] === 'open'
@@ -726,8 +751,13 @@ Nest.prototype.process_in_table_anything_else = function(name, token) {
   // Enable foster parenting, process the token using the rules for the "in body"
   // insertion mode, and then disable foster parenting.
   this.foster_parenting = true;
+  this.foster_parenting_sidx = this.stack.length;
   var re = this.process_in_body(name, token);
-  this.disable_foster_parenting();
+
+  if (this.foster_parenting_sidx !== null
+  && this.foster_parenting_sidx === this.stack.length) {
+    this.disable_foster_parenting();
+  }
   return re;
 }
 
@@ -736,6 +766,7 @@ Nest.prototype.disable_foster_parenting = function() {
   if (!this.foster_parenting) return;
   if (this.tokenizer_state) return;
   this.foster_parenting = false;
+  this.foster_parenting_sidx = null;
 /*
   while (t = this.foster_buffer.pop()) {
       this.buffer.unshift(t);
@@ -1230,7 +1261,53 @@ Nest.prototype.process_in_select = function(name, token) {
 
 }
 Nest.prototype.process_in_select_in_table = function(name, token) {
-  console.log('in_select_in_table is NOT IMPLEMENTED');
+  var node;
+  // A start tag whose tag name is one of: "caption", "table",
+  // "tbody", "tfoot", "thead", "tr", "td", "th"
+  if (token[0] === 'open'
+  && ['caption', 'table', 'tbody', 'tfoot', 'thead',
+  'tr', 'td', 'th'].indexOf(name) !== -1) {
+    // Parse error.
+    // Pop elements from the stack of open elements until
+    // a select element has been popped from the stack.
+    do {
+      node = this.stack.pop();
+      this.enqueue(node, [ 'close', Buffer('</'+node+'>')])
+    } while (node !== 'select');
+    // Reset the insertion mode appropriately.
+    this.reset_the_insertion_mode_appropriately();
+    // Reprocess the token.
+    return true;
+  }
+  // An end tag whose tag name is one of: "caption", "table",
+  // "tbody", "tfoot", "thead", "tr", "td", "th"
+  else if (token[0] === 'close'
+  && ['caption', 'table', 'tbody', 'tfoot', 'thead',
+  'tr', 'td', 'th'].indexOf(name) !== -1) {
+    // Parse error.
+    // If the stack of open elements does not have an element in table scope
+    // that is an HTML element with the same tag name as that of the token,
+    // then ignore the token.
+    if (!this.has_in_table_scope(name)) {
+      return;
+    }
+    // Otherwise:
+    // Pop elements from the stack of open elements until
+    // a select element has been popped from the stack.
+    do {
+      node = this.stack.pop();
+      this.enqueue(node, [ 'close', Buffer('</'+node+'>')])
+    } while (node !== 'select');
+    // Reset the insertion mode appropriately.
+    this.reset_the_insertion_mode_appropriately();
+    // Reprocess the token.
+    return true;
+  }
+  // Anything else
+  else {
+    // Process the token using the rules for the "in select" insertion mode.
+    return this.process_in_select(name, token);
+  }
 }
 Nest.prototype.process_in_cell = function(name, token) {
   var current_node;
@@ -1292,7 +1369,7 @@ Nest.prototype.process_in_cell = function(name, token) {
   // An end tag whose tag name is one of: "table", "tbody",
   // "tfoot", "thead", "tr"
   else if (token[0] === 'close'
-  && ['table','tbody','tfoot','thead','tr'].indexOf(name) !== 1) {
+  && ['table','tbody','tfoot','thead','tr'].indexOf(name) !== -1) {
     // If the stack of open elements does not have an element
     // in table scope that is an HTML element with the same tag
     // name as that of the token, then this is a parse error;
@@ -1482,12 +1559,15 @@ Nest.prototype.process_after_after_body = function(name, token) {
 Nest.prototype.process_text = function(name, token) {
   
   // forward all tokens
-  this.enqueue(name, token);
+  if (token[0] === 'text') {
+    this.enqueue(name, token);
+  }
   
   // intercept the end of the text mode
   if (this.tokenizer_state === 'script_data') {
     if (token[0] === 'close'
     && name === 'script') {
+      this.enqueue(name, token);
       this.insertion_mode = this.insertion_mode_saved;
       this.insertion_mode_saved = null;
       this.tokenizer_state = null;
@@ -1496,6 +1576,8 @@ Nest.prototype.process_text = function(name, token) {
   else if (this.tokenizer_state === 'RCDATA') {
     if (token[0] === 'close'
     && name === 'title') {
+      this.stack.pop()
+      this.enqueue(name, token);
       this.insertion_mode = this.insertion_mode_saved;
       this.insertion_mode_saved = null;
       this.tokenizer_state = null;
@@ -1504,16 +1586,17 @@ Nest.prototype.process_text = function(name, token) {
   else if (this.tokenizer_state === 'RAWTEXT') {
     if (token[0] === 'close'
     && ['noframes', 'style'].indexOf(name) !== -1) {
+      this.enqueue(name, token);
       this.insertion_mode = this.insertion_mode_saved;
       this.insertion_mode_saved = null;
       this.tokenizer_state = null;
     }
   }
-
+/*
   if (this.foster_parenting) {
     this.disable_foster_parenting();
   }
-
+*/
   if (this.foster_head) {
     this.disable_foster_head();
   }
@@ -1617,16 +1700,16 @@ Nest.prototype._flush = function (next) {
     token = ['eof', Buffer('<eof/>')];
     while (reprocess = this.process(token)) {}
 
-    // flush formatting buffer
-    while (token = this.buffer.shift()) {
-      this.push(token);
-    }
+    // flush the remaining buffers
+    this.flush_seqs();
 
     // 12.2.6 The end
     // Pop all the nodes off the stack of open elements.
     var current_node;
     while (current_node = this.stack.pop()) {
-      this.push(['close', Buffer('</' + current_node + '>')])
+      if (!this.fragment_case || this.stack.length !== 0) {
+        this.push(['close', Buffer('</' + current_node + '>')])
+      }
     }
     this.push(null);
     next();
@@ -1961,13 +2044,7 @@ Nest.prototype.enqueue = function(name, token) {
   else if (!this.has_in_scope('table')
   && this.format.length === 0
   && !this.foster_head_pending) {
-    while (buf = this.seqs.shift()) {
-      while (tok = buf.shift()) {
-        this.push(tok);
-      }
-    }
-    this.buffer = [];
-    this.seqs.push(this.buffer);
+    this.flush_seqs();
     this.push(token);
   }
   // otherwise we need to buffer the tokens in case
@@ -1984,6 +2061,23 @@ Nest.prototype.enqueue = function(name, token) {
     }
     //console.log(this.buffer.length);
   }
+
+  if (this.foster_parenting_sidx !== null
+  && this.foster_parenting_sidx === this.stack.length) {
+    this.disable_foster_parenting();
+  }
+
+}
+
+Nest.prototype.flush_seqs = function() {
+  var buf, tok;
+  while (buf = this.seqs.shift()) {
+    while (tok = buf.shift()) {
+      this.push(tok);
+    }
+  }
+  this.buffer = [];
+  this.seqs.push(this.buffer);
 }
 
 function getName(buf) {

@@ -3,6 +3,7 @@ var through = require('through2')
 var test = require('tape');
 var tokenize = require('html-tokenize');
 var nest = require('../');
+var parse_tag = require('../parse_tag.js')
 
 var dat = fs.createReadStream(__dirname + '/html5lib-tests/tree-construction/tests7.dat');
 
@@ -76,7 +77,7 @@ var parser = through(function(row, enc, next) {
 
 var velements = [ 'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'];
 var num = 0;
-var limit = 13;
+var limit = 26
 function addTest(desc) {
   num++;
   if (num > limit) return;
@@ -91,7 +92,12 @@ function addTest(desc) {
     console.log(expected)
 
     t.plan(2*expected.length)
-    var n = nest();
+    var n;
+    if (desc['document-fragment']) {
+      n = nest({ context: desc['document-fragment'].pop() });
+    } else {
+      n = nest();
+    }
     var tok = tokenize();
 
     while(line=desc.data.shift()){
@@ -99,14 +105,53 @@ function addTest(desc) {
     }
     tok.end()
 
+
+    var more_text = false;
+    var pending_text = '';
+    var exp;
     tok.pipe(n).pipe(through.obj(function(row,_,next) {
-      var exp = expected.shift();
-      t.equal(row[0], exp[0]);
-      var actual = row[1].toString();
-      if (row[0] === 'open') {
-        actual = actual.toLowerCase();
+      if (more_text) {
+        //t.equal(row[0], 'text', 'more text');
+      } else {
+        exp = expected.shift();
+        t.equal(row[0], exp[0]);
       }
-      t.equal(actual, exp[1], row[1].toString() + ' <-> ' + exp[1]); 
+
+      var exp_name = exp[1];
+      var act_name = row[1].toString();
+      var id_attrs = true;
+      var tt;
+      if (row[0] === 'open') {
+        var exp_tag = parse_tag(exp[1]);
+        var act_tag = parse_tag(row[1]);
+        var exp_attr = exp_tag.getAttributes();
+        var act_attr = act_tag.getAttributes();
+        for (var a in exp_attr) {
+          if (exp_attr[a] !== act_attr[a]) is_attrs = false;
+        }
+        for (var a in act_attr) {
+          if (exp_attr[a] !== act_attr[a]) is_attrs = false;
+        }
+        exp_name = exp_tag.name;
+        act_name = act_tag.name.toLowerCase();
+        tt = id_attrs && (act_name === exp_name);
+      }
+      else if (row[0] === 'close') {
+        tt = (act_name === exp_name);
+      } 
+      else {
+        pending_text += act_name;
+        more_text = pending_text.length !== exp_name.length;
+        //console.log(more_text, pending_text, exp_name)
+        tt = pending_text === exp_name;
+        if (!more_text) {
+          pending_text = '';
+        }
+      }
+
+      if (!more_text) {
+        t.equal(true, tt, 'act:'+row[1].toString() + ' <-> ' + 'exp:' + exp[1]); 
+      }
       next();
     }))
 
@@ -155,10 +200,17 @@ function getTokens(doc) {
       } else {
         console.log('FATAL');
       }
+    } else {
+      // this is an attribute
+      tokens[tokens.length-1][1]=
+      tokens[tokens.length-1][1].substr(0, tokens[tokens.length-1][1].length-1)
+      + ' ' + line + '>'
     }
   }
   while (name = stack.pop()) {
-    tokens.push(['close', '</'+name+'>'])
+    if (velements.indexOf(name) === -1) {
+      tokens.push(['close', '</'+name+'>'])
+    }
   }
   return tokens;
 }
