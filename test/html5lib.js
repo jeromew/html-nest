@@ -77,7 +77,7 @@ var parser = through(function(row, enc, next) {
 
 var velements = [ 'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'];
 var num = 0;
-var limit = 26
+var limit = 40
 function addTest(desc) {
   num++;
   if (num > limit) return;

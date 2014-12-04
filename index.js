@@ -362,6 +362,7 @@ Nest.prototype.disable_foster_head = function() {
 Nest.prototype.process_in_body = function(name, token) {
   var idx, node, current_node, state;
   var tag, attrs;
+  var marker;
   // Any other character token
   if (token[0] === 'text') {
     // Reconstruct the active formatting elements, if any.
@@ -450,11 +451,84 @@ Nest.prototype.process_in_body = function(name, token) {
       // Ignore the token.
     }
   }
+  // A start tag whose tag name is one of: "b", "big", "code", "em", "font", "i", "s", "small", "strike", "strong", "tt", "u"
+  else if (token[0] === 'open'
+  && ['b','big','code','em','font','i','s','small',
+      'strike','strong','tt','u'].indexOf(name) !== -1) {
+    // Reconstruct the active formatting elements, if any.
+    this.reconstruct_formatting();
+    // Insert an HTML element for the token.
+    // Push onto the list of active formatting elements that element.
+    this.stack.push(name);
+    this.enqueue(name, token);
+    this.format.push(name);
+  }
+  // A start tag whose tag name is "nobr"
+  else if (token[0] === 'open'
+  && name === 'nobr') {
+    // Reconstruct the active formatting elements, if any.
+    this.reconstruct_formatting();
+    // If the stack of open elements has a nobr element in scope,
+    // then this is a parse error; run the adoption agency algorithm
+    // for the tag name "nobr", then once again reconstruct the active
+    // formatting elements, if any.
+    if (this.has_in_standard_scope('nobr')) {
+      this.adoption_agency_algorithm(name);
+      this.reconstruct_formatting();
+    }
+    // Insert an HTML element for the token.
+    // Push onto the list of active formatting elements that element.
+    this.stack.push(name);
+    this.enqueue(name, token);
+    this.format.push(name);
+  }
   // An end tag whose tag name is one of: "a", "b", "big", "code", "em",
   // "font", "i", "nobr", "s", "small", "strike", "strong", "tt", "u"
   else if (token[0] === 'close'
-  && tags['in_body_end_tags_bundle_2'].indexOf(name) !== -1) {
+  && ["a", "b", "big", "code", "em", "font", "i", "nobr", "s", "small",
+      "strike", "strong", "tt", "u"].indexOf(name) !== -1) {
     this.adoption_agency_algorithm(name);
+  }
+  // A start tag whose tag name is one of: "applet", "marquee", "object"
+  else if (token[0] === 'open'
+  && ["applet", "marquee", "object"].indexOf(name) !== -1) {
+    // Reconstruct the active formatting elements, if any.
+    this.reconstruct_formatting();
+    // Insert an HTML element for the token.
+    this.stack.push(name);
+    this.enqueue(name, token);
+    // Insert a marker at the end of the list of active formatting elements.
+    this.format.push(FMT_MARKER);
+    // Set the frameset-ok flag to "not ok".
+    this.frameset_ok = 'not ok';
+  }
+  // An end tag token whose tag name is one of: "applet", "marquee", "object"
+  else if (token[0] === 'close'
+  && ["applet", "marquee", "object"].indexOf(name) !== -1) {
+    // If the stack of open elements does not have an element in scope
+    // that is an HTML element with the same tag name as that of the token,
+    // then this is a parse error; ignore the token.
+    if (!this.has_in_standard_scope(name)) {
+      return;
+    }
+    // Otherwise, run these steps:
+    // 1. Generate implied end tags.
+    this.generate_implied_end_tags();
+    // 2. If the current node is not an HTML element with the same tag
+    // name as that of the token, then this is a parse error.
+    // 3. Pop elements from the stack of open elements until
+    // an HTML element with the same tag name as the token has been
+    // popped from the stack.
+    do {
+      node = this.stack.pop();
+      this.enqueue(name, ['close', Buffer('</'+node+'>')])
+    } while (node !== name);
+    // 4. Clear the list of active formatting elements up to the
+    // last marker.
+    marker = this.format.lastIndexOf(FMT_MARKER);
+    if (marker !== -1) {
+      this.format = this.format.slice(0, marker);
+    }
   }
   // A start tag whose tag name is "table"
   else if (token[0] === 'open'
@@ -1628,7 +1702,7 @@ Nest.prototype.process = function(token) {
     return false;
   }
 
-  //console.log(this.insertion_mode, token[0], token[1].toString());
+  //console.log(this.insertion_mode, token[0], token[1].toString(), 'fmt:'+this.format.join('/'));
   switch(this.insertion_mode) {
     case 'initial':
       reprocess = this.process_initial(name, token);
@@ -1714,6 +1788,38 @@ Nest.prototype._flush = function (next) {
     this.push(null);
     next();
 };
+
+Nest.prototype.has_in_standard_scope = function(target) {
+  // The stack of open elements is said to have a particular element
+  // in scope when it has that element in the specific scope consisting
+  // of the following element types:
+  // applet in the HTML namespace
+  // caption in the HTML namespace
+  // html in the HTML namespace
+  // table in the HTML namespace
+  // td in the HTML namespace
+  // th in the HTML namespace
+  // marquee in the HTML namespace
+  // object in the HTML namespace
+  // template in the HTML namespace
+  // mi in the MathML namespace
+  // mo in the MathML namespace
+  // mn in the MathML namespace
+  // ms in the MathML namespace
+  // mtext in the MathML namespace
+  // annotation-xml in the MathML namespace
+  // foreignObject in the SVG namespace
+  // desc in the SVG namespace
+  // title in the SVG namespace
+
+  // TODO: non HTML namespaces
+  var stop = function(node) {
+    return ['applet','caption','html','table','td','th','marquee',
+            'object','template'].indexOf(node) !== -1;
+  }
+  return this.has_in_specific_scope(target, stop);
+}
+
 Nest.prototype.has_in_select_scope = function(target) {
   // The stack of open elements is said to have a particular element
   // in select scope when it has that element in the specific scope
@@ -1758,7 +1864,7 @@ Nest.prototype.has_in_scope = function(name) {
 }
 
 Nest.prototype.reconstruct_formatting = function() {
- 
+
   // 1. If there are no entries in the list of active formatting elements,
   // then there is nothing to reconstruct; stop this algorithm.
   if (this.format.length === 0) {
@@ -1816,8 +1922,8 @@ Nest.prototype.reconstruct_formatting = function() {
 
       // 8. Create: Insert an HTML element for the token for which the
       // element entry was created, to obtain new element.
-      this.enqueue(entry, ['open', Buffer('<' + entry + '>')]);
       this.stack.push(entry);
+      this.enqueue(entry, ['open', Buffer('<' + entry + '>')]);
 
       // 9. Replace the entry for entry in the list with an entry for new element.
       // TODO: try to confirm that there is nothing to do here in html-nest's context
