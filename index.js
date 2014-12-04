@@ -459,6 +459,65 @@ Nest.prototype.process_in_body = function(name, token) {
     // Switch the insertion mode to "in table".
     this.insertion_mode = 'in_table';
   }
+  // An end tag whose tag name is "br"
+  else if (token[0] === 'close'
+  && name === 'br') {
+    // Parse error. Drop the attributes from the token, and
+    // act as described in the next entry; i.e. act as if this
+    // was a "br" start tag token with no attributes, rather
+    // than the end tag token that it actually is.
+    token[0] = 'open';
+    token[1] = Buffer('<br>');
+    return true;
+  }
+  // A start tag whose tag name is one of: "area", "br", "embed", "img", "keygen", "wbr"
+  else if (token[0] === 'open'
+  && ['area','br','embed','img','keygen','wbr'].indexOf(name) !== -1) {
+    // Reconstruct the active formatting elements, if any.
+    this.reconstruct_formatting();
+    // Insert an HTML element for the token.
+    // Immediately pop the current node off the stack of open elements.
+    this.enqueue(name, token);
+    // Acknowledge the token's self-closing flag, if it is set.
+    // Set the frameset-ok flag to "not ok".
+    this.frameset_ok = 'not ok';
+  }
+  // A start tag whose tag name is "input"
+  else if (token[0] === 'open'
+  && name === 'input') {
+    // Reconstruct the active formatting elements, if any.
+    this.reconstruct_formatting();
+    // Insert an HTML element for the token.
+    // Immediately pop the current node off the stack of open elements.
+    this.enqueue(name, token);
+    // Acknowledge the token's self-closing flag, if it is set.
+    // If the token does not have an attribute with the name "type",
+    // or if it does, but that attribute's value is not
+    // an ASCII case-insensitive match for the string "hidden",
+    // then: set the frameset-ok flag to "not ok".
+    // TODO
+  }
+  // A start tag whose tag name is "select"
+  else if (token[0] === 'open'
+  && name === 'select') {
+    // Reconstruct the active formatting elements, if any.
+    this.reconstruct_formatting();
+    // Insert an HTML element for the token.
+    this.stack.push(name);
+    this.enqueue(name, token);
+    // Set the frameset-ok flag to "not ok".
+    this.frameset_ok = 'not ok';
+    // If the insertion mode is one of "in table", "in caption",
+    // "in table body", "in row", or "in cell",
+    // then switch the insertion mode to "in select in table".
+    // Otherwise, switch the insertion mode to "in select".
+    if (['in_table', 'in_caption', 'in_table_body', 'in_row',
+        'in_cell'].indexOf(this.insertion_mode) !== -1) {
+      this.insertion_mode = 'in_select_in_table';
+    } else {
+      this.insertion_mode = 'in_select';
+    }
+  }
   // A start tag whose tag name is one of: "caption", "col", "colgroup",
   // "frame", "head", "tbody", "td", "tfoot", "th", "thead", "tr"
   else if (token[0] === 'open'
@@ -648,7 +707,7 @@ Nest.prototype.process_in_table = function(name, token) {
     // Pop that form element off the stack of open elements.
   }
   // An end-of-file token
-  else if (false) {
+  else if (token[0] === 'eof') {
     // Process the token using the rules for the "in body" insertion mode.
     return this.process_in_body(name, token);
   }
@@ -982,7 +1041,193 @@ Nest.prototype.process_in_table_body = function(name, token) {
 }
 
 Nest.prototype.process_in_select = function(name, token) {
-  console.log('in_select is NOT IMPLEMENTED');
+  var node, sidx;
+  // A character token that is U+0000 NULL
+  if (false) {
+    // Parse error. Ignore the token.
+  }
+  // Any other character token
+  else if (token[0] === 'text') {
+    // Insert the token's character.
+    this.enqueue(name, token);
+  }
+  // A comment token
+  else if (token[0] === 'open'
+  && name === OPEN_COMMENT) {
+    // Insert a comment.
+    this.insertion_mode_saved = this.insertion_mode;
+    this.insertion_mode = 'xx_comment';
+    return true;
+  }
+  // A DOCTYPE token
+  else if (token[0] === 'open'
+  && name === '!doctype') {
+    // Parse error. Ignore the token.
+  }
+  // A start tag whose tag name is "html"
+  else if (token[0] === 'open'
+  && name === 'html') {
+    //Process the token using the rules for the "in body" insertion mode.
+    return this.process_in_body(name, token);
+  }
+  // A start tag whose tag name is "option"
+  else if (token[0] === 'open'
+  && name === 'option') {
+    // If the current node is an option element,
+    // pop that node from the stack of open elements.
+    node = this.stack[this.stack.length-1];
+    if (node === 'option') {
+      this.stack.pop();
+      this.enqueue('option', [ 'close', Buffer('</option>')])
+    }
+    // Insert an HTML element for the token.
+    this.stack.push(name);
+    this.enqueue(name, token);
+  }
+  // A start tag whose tag name is "optgroup"
+  else if (token[0] === 'open'
+  && name === 'optgroup') {
+    // If the current node is an option element,
+    // pop that node from the stack of open elements.
+    node = this.stack[this.stack.length-1];
+    if (node === 'option') {
+      this.stack.pop();
+      this.enqueue('option', [ 'close', Buffer('</option>')])
+    }
+
+    // If the current node is an optgroup element,
+    // pop that node from the stack of open elements.
+    node = this.stack[this.stack.length-1];
+    if (node === 'optgroup') {
+      this.stack.pop();
+      this.enqueue('optgroup', [ 'close', Buffer('</optgroup>')])
+    }
+
+    // Insert an HTML element for the token.
+    this.stack.push(name);
+    this.enqueue(name, token);
+
+  }
+  // An end tag whose tag name is "optgroup"
+  else if (token[0] === 'close'
+  && name === 'optgroup') {
+    // First, if the current node is an option element,
+    // and the node immediately before it in the stack of open elements
+    // is an optgroup element,
+    // then pop the current node from the stack of open elements.
+    sidx = this.stack.length-1;
+    if (this.stack[sidx] === 'option'
+    && this.stack[sidx-1] === 'optgroup') {
+      this.stack.pop();
+      this.enqueue('option', [ 'close', Buffer('</option>')])
+    }
+    // If the current node is an optgroup element,
+    // then pop that node from the stack of open elements.
+    // Otherwise, this is a parse error; ignore the token.
+    node = this.stack[this.stack.length-1];
+    if (node === 'optgroup') {
+      this.stack.pop();
+      this.enqueue('optgroup', [ 'close', Buffer('</optgroup>')])
+    } else {
+      return false;
+    }
+  }
+  // An end tag whose tag name is "option"
+  else if (token[0] === 'close'
+  && name === 'option') {
+    // If the current node is an option element,
+    // then pop that node from the stack of open elements.
+    // Otherwise, this is a parse error; ignore the token.
+    node = this.stack[this.stack.length-1];
+    if (node === 'option') {
+      this.stack.pop();
+      this.enqueue('option', [ 'close', Buffer('</option>')])
+    } else {
+      return false;
+    }
+  }
+  // An end tag whose tag name is "select"
+  else if (token[0] === 'close'
+  && name === 'select') {
+    // If the stack of open elements does not have a select element
+    // in select scope, this is a parse error;
+    // ignore the token. (fragment case)
+    if (!this.has_in_select_scope('select')) {
+      return false;
+    }
+
+    // Otherwise:
+    // Pop elements from the stack of open elements until
+    // a select element has been popped from the stack.
+    do {
+      node = this.stack.pop();
+      this.enqueue(node, [ 'close', Buffer('</'+node+'>')])
+    } while (node !== 'select');
+
+    // Reset the insertion mode appropriately.
+    this.reset_the_insertion_mode_appropriately(); 
+  }
+  // A start tag whose tag name is "select"
+  else if (token[0] === 'open'
+  && name === 'select') {
+    // Parse error.
+    // If the stack of open elements does not have a select element
+    // in select scope, ignore the token. (fragment case)
+    if (!this.has_in_select_scope('select')) {
+      return false;
+    }
+    // Otherwise:
+    // Pop elements from the stack of open elements until
+    // a select element has been popped from the stack. 
+    do {
+      node = this.stack.pop();
+      this.enqueue(node, [ 'close', Buffer('</'+node+'>')])
+    } while (node !== 'select');
+
+    // Reset the insertion mode appropriately.
+    this.reset_the_insertion_mode_appropriately();
+
+  }
+  // A start tag whose tag name is one of: "input", "keygen", "textarea"
+  else if (token[0] === 'open'
+  && ['input', 'keygen', 'textarea'].indexOf(name) !== -1) {
+    // Parse error.
+    // If the stack of open elements does not have a select element
+    // in select scope, ignore the token. (fragment case)
+    if (!this.has_in_select_scope('select')) {
+      return false;
+    }
+    // Pop elements from the stack of open elements until
+    // a select element has been popped from the stack.
+    do {
+      node = this.stack.pop();
+      this.enqueue(node, [ 'close', Buffer('</'+node+'>')])
+    } while (node !== 'select');
+
+    // Reset the insertion mode appropriately.
+    this.reset_the_insertion_mode_appropriately();
+
+    // Reprocess the token.
+    return true;
+  }
+  // A start tag whose tag name is one of: "script", "template"
+  // An end tag whose tag name is "template"
+  else if ((token[0] === 'close' && name === 'template')
+  || (token[0] === 'open'
+  && ['script', 'template'].indexOf(name) !== -1)) {
+    // Process the token using the rules for the "in head" insertion mode.
+    return this.process_in_head(name, token);
+  }
+  // An end-of-file token
+  else if (token[0] === 'eof') {
+    // Process the token using the rules for the "in body" insertion mode.
+    return this.process_in_body(name, token);
+  }
+  // Anything else
+  else {
+    // Parse error. Ignore the token.
+  }
+
 }
 Nest.prototype.process_in_select_in_table = function(name, token) {
   console.log('in_select_in_table is NOT IMPLEMENTED');
@@ -1386,15 +1631,29 @@ Nest.prototype._flush = function (next) {
     this.push(null);
     next();
 };
-Nest.prototype.has_in_table_scope = function(target) {
-  return this.has_in_specific_scope(target, ['html', 'table', 'template']);
+Nest.prototype.has_in_select_scope = function(target) {
+  // The stack of open elements is said to have a particular element
+  // in select scope when it has that element in the specific scope
+  // consisting of all element types except the following:
+  // * optgroup in the HTML namespace
+  // * option in the HTML namespace
+  var stop = function(node) {
+    return ['optgroup', 'option'].indexOf(node) === -1;
+  }
+  return this.has_in_specific_scope(target, stop); 
 }
-Nest.prototype.has_in_specific_scope = function(target, scope) {
+Nest.prototype.has_in_table_scope = function(target) {
+  var stop = function(node) {
+    return ['html', 'table', 'template'].indexOf(node) !== -1;
+  }
+  return this.has_in_specific_scope(target, stop);
+}
+Nest.prototype.has_in_specific_scope = function(target, stop) {
   // 1. Initialise node to be the current node (the bottommost node of the stack).
   var node_sidx = this.stack.length;
   var node;
 
-  while (true) {
+  while (node_sidx>0) {
     node_sidx--;
     node = this.stack[node_sidx];
   
@@ -1402,12 +1661,13 @@ Nest.prototype.has_in_specific_scope = function(target, scope) {
     if (node === target) return true;
 
     // 3. Otherwise, if node is one of the element types in list, terminate in a failure state.
-    if (scope.indexOf(node) !== -1) return false;
+    if (stop(node)) return false;
 
     // 4. Otherwise, set node to the previous entry in the stack of open elements and return
     // to step 2. (This will never fail, since the loop will always terminate in the previous step
     // if the top of the stack — an html element — is reached.)
   }
+  return false;
 }
 
 Nest.prototype.has_in_scope = function(name) {

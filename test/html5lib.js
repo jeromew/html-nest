@@ -76,7 +76,7 @@ var parser = through(function(row, enc, next) {
 
 var velements = [ 'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'];
 var num = 0;
-var limit = 9;
+var limit = 13;
 function addTest(desc) {
   num++;
   if (num > limit) return;
@@ -102,7 +102,11 @@ function addTest(desc) {
     tok.pipe(n).pipe(through.obj(function(row,_,next) {
       var exp = expected.shift();
       t.equal(row[0], exp[0]);
-      t.equal(row[1].toString(), exp[1], row[1].toString() + ' <-> ' + exp[1]); 
+      var actual = row[1].toString();
+      if (row[0] === 'open') {
+        actual = actual.toLowerCase();
+      }
+      t.equal(actual, exp[1], row[1].toString() + ' <-> ' + exp[1]); 
       next();
     }))
 
