@@ -1,0 +1,36 @@
+{
+"table - simple": {
+"input": [
+   [ "open",  "<table>"  ]
+  ,[ "open",  "<tr>"  ]
+  ,[ "open",  "<td>"  ]
+  ,[ "text",  "A" ]
+  ,[ "close", "</td>"  ]
+  ,[ "open",  "<td>"  ]
+  ,[ "text",  "B" ]
+  ,[ "close", "</td>"  ]
+  ,[ "close", "</tr>"  ]
+  ,[ "close", "</table>"  ]
+],
+"output": [
+   [ "open",  "<html>"  ]
+  ,[ "open",  "<head>"  ]
+  ,[ "close", "</head>" ]
+  ,[ "open",  "<body>"  ]
+  ,[ "open",  "<table>"  ]
+  ,[ "open",  "<tbody>"  ]
+  ,[ "open",  "<tr>"  ]
+  ,[ "open",  "<td>"  ]
+  ,[ "text",  "A" ]
+  ,[ "close", "</td>"  ]
+  ,[ "open",  "<td>"  ]
+  ,[ "text",  "B" ]
+  ,[ "close", "</td>"  ]
+  ,[ "close", "</tr>"  ]
+  ,[ "close", "</tbody>"  ]
+  ,[ "close", "</table>"  ]
+  ,[ "close", "</body>" ]
+  ,[ "close", "</html>" ]
+]}
+}
+

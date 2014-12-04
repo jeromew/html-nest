@@ -4,17 +4,19 @@
   "description": "Apply the HTML5 Tree Construction algorithm to a stream of html-tokenize tokens",
   "main": "index.js",
   "scripts": {
-    "test": "tape test/*.js"
+    "test": "node test/download-html5lib-tests && tape test/*.js"
   },
   "author": "Jérôme Wagner <jerome.wagner@m4x.org>",
   "license": "MIT",
   "dependencies": {
+    "gethub": "^2.0.1",
     "inherits": "^2.0.1",
     "readable-stream": "^1.0.33",
     "through2": "^0.6.3"
   },
   "devDependencies": {
     "glob": "^4.3.1",
+    "html-tokenize": "^1.2.2",
     "tape": "~2.12.1"
   },
   "repository": {
