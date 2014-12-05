@@ -10,7 +10,8 @@ var remove = [
 ]
 
 var  OPEN_COMMENT = '!--';
-var CLOSE_COMMENT = '-';
+var CLOSE_COMMENT1 = '-';
+var CLOSE_COMMENT2 = '';
 
 var FMT_MARKER = '_';
 
@@ -38,16 +39,6 @@ var tags = {
     [ 'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link',
     'menuitem', 'meta', 'param', 'source', 'track', 'wbr'],
 
-  // https://html.spec.whatwg.org/multipage/syntax.html#parsing-main-inbody
-  'in_body_end_tags':
-    [ 'address', 'article', 'aside', 'blockquote', 'button',
-    'center', 'details', 'dialog', 'dir', 'div', 'dl', 'fieldset', 'figcaption',
-    'figure', 'footer', 'header', 'hgroup', 'listing', 'main', 'menu', 'nav',
-    'ol', 'pre', 'section', 'summary', 'ul' ],
-
-  'in_body_end_tags_bundle_2':
-    [ 'a', 'b', 'big', 'code', 'em', 'font', 'i', 'nobr', 's', 'small', 'strike',
-    'strong', 'tt', 'u']
 }
 
 
@@ -67,6 +58,8 @@ function Nest (opts) {
     this.frameset_ok;
     this.pending_table_character_tokens;
     this.pending_table_character_tokens_space_only = true;
+
+    this.scripting_flag = false;
 
     this.foster_head_pending = false;
     this.foster_head = false;
@@ -363,23 +356,34 @@ Nest.prototype.process_in_body = function(name, token) {
   var idx, node, current_node, state;
   var tag, attrs;
   var marker;
+  // A character token that is U+0000 NULL
+  if (false) {
+  }
+  // A character token that is one of U+0009 CHARACTER TABULATION,
+  // U+000A LINE FEED (LF), U+000C FORM FEED (FF),
+  // U+000D CARRIAGE RETURN (CR), or U+0020 SPACE
+  else if (false) {
+  }
   // Any other character token
-  if (token[0] === 'text') {
+  else if (token[0] === 'text') {
     // Reconstruct the active formatting elements, if any.
     this.reconstruct_formatting();
     // Insert the token's character.
     this.enqueue(name, token);
   }
+  // A comment token
   else if (token[0] === 'open'
   && name === OPEN_COMMENT) {
     this.insertion_mode_saved = this.insertion_mode;
     this.insertion_mode = 'xx_comment';
     return true;
   }
+  // A DOCTYPE token
   else if (token[0] === 'open'
   && name === '!doctype') {
     // Ignore token
   }
+  // A start tag whose tag name is "html"
   else if (token[0] === 'open'
   && name === 'html') {
   }
@@ -397,8 +401,28 @@ Nest.prototype.process_in_body = function(name, token) {
   else if (token[0] === 'open'
   && name === 'body') {
   }
+  // A start tag whose tag name is "frameset"
   else if (token[0] === 'open'
   && name === 'frameset') {
+    console.log('in_body: ' + name + 'NOT IMPLEMENTED');
+  }
+  // An end-of-file token
+  else if (token[0] === 'eof') {
+    // If the stack of template insertion modes is not empty,
+    // then process the token using the rules for the "in template"
+    // insertion mode.
+    // TODO: template
+
+    // Otherwise, follow these steps:
+    // If there is a node in the stack of open elements that
+    // is not either a dd element, a dt element, an li element,
+    // an optgroup element, an option element, a p element,
+    // an rp element, an rt element, a tbody element, a td element,
+    // a tfoot element, a th element, a thead element,
+    // a tr element, the body element, or the html element,
+    // then this is a parse error.
+
+    // Stop parsing.
   }
   // An end tag whose tag name is "body"
   else if (token[0] === 'close'
@@ -414,6 +438,74 @@ Nest.prototype.process_in_body = function(name, token) {
     }
     this.insertion_mode = 'after_body';
     return true;
+  }
+  // A start tag whose tag name is one of: "address", "article",
+  // "aside", "blockquote", "center", "details", "dialog", "dir",
+  // "div", "dl", "fieldset", "figcaption", "figure", "footer",
+  // "header", "hgroup", "main", "menu", "nav", "ol", "p", "section",
+  // "summary", "ul"
+  else if (token[0] === 'open'
+  && ["address", "article", "aside", "blockquote", "center",
+      "details", "dialog", "dir", "div", "dl", "fieldset",
+      "figcaption", "figure", "footer", "header", "hgroup",
+      "main", "menu", "nav", "ol", "p", "section", "summary",
+      "ul"].indexOf(name) !== -1) {
+    // If the stack of open elements has a p element in button scope,
+    // then close a p element.
+    if (this.has_in_button_scope('p')) {
+      this.close_a_p_element();
+    }
+    // Insert an HTML element for the token.
+    this.stack.push(name);
+    this.enqueue(name, token);
+  }
+  // A start tag whose tag name is one of: "h1", "h2", "h3",
+  // "h4", "h5", "h6"
+  else if (token[0] === 'open'
+  && ["h1", "h2", "h3", "h4", "h5", "h6"].indexOf(name) !== -1) {
+    // If the stack of open elements has a p element in button scope,
+    // then close a p element.
+    if (this.has_in_button_scope('p')) {
+      this.close_a_p_element();
+    }
+    // If the current node is an HTML element whose tag name is one
+    // of "h1", "h2", "h3", "h4", "h5", or "h6", then this is a parse error;
+    // pop the current node off the stack of open elements.
+    node = this.stack.pop();
+    if (['h1','h2','h3','h4','h5','h6'].indexOf(node) !== -1) {
+      this.enqueue(node, ['close', Buffer('</'+node+'>')])
+    } else {
+      this.stack.push(node);
+    }
+
+    // Insert an HTML element for the token.
+    this.stack.push(name);
+    this.enqueue(name, token);
+  }
+  // A start tag whose tag name is one of: "pre", "listing"
+  else if (token[0] === 'open'
+  && ["pre", "listing"].indexOf(name) !== -1) {
+    // If the stack of open elements has a p element in button scope,
+    // then close a p element.
+    if (this.has_in_button_scope('p')) {
+      this.close_a_p_element();
+    }
+    // Insert an HTML element for the token.
+    this.stack.push(name);
+    this.enqueue(name, token);
+
+    // If the next token is a U+000A LINE FEED (LF) character token,
+    // then ignore that token and move on to the next one.
+    // (Newlines at the start of pre blocks are ignored as an authoring convenience.)
+    // TODO
+
+    // Set the frameset-ok flag to "not ok".
+    this.frameset_ok = 'not ok';
+  }
+  // A start tag whose tag name is "form"
+  else if (token[0] === 'open'
+  && name === "form") {
+    console.log('in_body: ' + name + 'NOT IMPLEMENTED');
   }
   // A start tag whose tag name is "li"
   else if (token[0] === 'open'
@@ -440,18 +532,136 @@ Nest.prototype.process_in_body = function(name, token) {
     this.stack.push(name);
     this.enqueue(name, token)
   }
-  else if (token[0] === 'close'
-  && tags['in_body_end_tags'].indexOf(name) !== -1) {
-    if (this.has_in_scope(name)) {
-      while ((current_node = this.stack.pop()) !== name) {
-        this.enqueue(current_node, ['close', Buffer('</' + current_node + '>')])
-      }
-      this.enqueue(name, token);
-    } else {
-      // Ignore the token.
-    }
+  // A start tag whose tag name is one of: "dd", "dt"
+  else if (token[0] === 'open'
+  && ["dd", "dt"].indexOf(name) !== -1) {
+    console.log('in_body: ' + name + 'NOT IMPLEMENTED');
   }
-  // A start tag whose tag name is one of: "b", "big", "code", "em", "font", "i", "s", "small", "strike", "strong", "tt", "u"
+  // A start tag whose tag name is "plaintext"
+  else if (token[0] === 'open'
+  && ["plaintext"].indexOf(name) !== -1) {
+    console.log('in_body: ' + name + 'NOT IMPLEMENTED');
+  }
+  // A start tag whose tag name is "button"
+  else if (token[0] === 'open'
+  && ["button"].indexOf(name) !== -1) {
+    // 1. If the stack of open elements has a button element in scope,
+    // then run these substeps:
+    if (this.has_in_standard_scope('button')) {
+      // 1.1. Parse error.
+      // 1.2. Generate implied end tags.
+      this.generate_implied_end_tags();
+      // 1.3. Pop elements from the stack of open elements until
+      // a button element has been popped from the stack.
+      do {
+        node = this.stack.pop();
+        this.enqueue(node, ['close', Buffer('</'+node+'>')]);
+      } while (node !== name);
+    }
+    // 2. Reconstruct the active formatting elements, if any.
+    this.reconstruct_formatting();
+    // 3. Insert an HTML element for the token.
+    this.stack.push(name);
+    this.enqueue(name, token);
+    // 4. Set the frameset-ok flag to "not ok".
+    this.frameset_ok = 'not ok';
+  }
+  // An end tag whose tag name is one of: "address", "article",
+  // "aside", "blockquote", "button", "center", "details",
+  // "dialog", "dir", "div", "dl", "fieldset", "figcaption",
+  // "figure", "footer", "header", "hgroup", "listing", "main",
+  // "menu", "nav", "ol", "pre", "section", "summary", "ul"
+  else if (token[0] === 'close'
+  && ["address", "article", "aside", "blockquote", "button",
+      "center", "details", "dialog", "dir", "div", "dl", "fieldset",
+      "figcaption", "figure", "footer", "header", "hgroup", "listing",
+      "main", "menu", "nav", "ol", "pre", "section", "summary",
+      "ul"].indexOf(name) !== -1) {
+    // If the stack of open elements does not have an element in scope
+    // that is an HTML element with the same tag name as that of the token,
+    // then this is a parse error; ignore the token.
+    console.log('HERE HERE');
+    if (!this.has_in_standard_scope(name)) {
+      return;
+    }
+    // Otherwise, run these steps:
+    // 1. Generate implied end tags.
+    this.generate_implied_end_tags();
+    // 2. If the current node is not an HTML element with the same
+    // tag name as that of the token, then this is a parse error.
+    // 3. Pop elements from the stack of open elements until
+    // an HTML element with the same tag name as the token
+    // has been popped from the stack.
+    do {
+        node = this.stack.pop();
+        this.enqueue(node, ['close', Buffer('</'+node+'>')]);
+    } while (node !== name);
+  }
+  // An end tag whose tag name is "form"
+  else if (token[0] === 'close'
+  && ["form"].indexOf(name) !== -1) {
+    console.log('in_body: ' + name + 'NOT IMPLEMENTED');
+  }
+  // An end tag whose tag name is "p"
+  else if (token[0] === 'close'
+  && ["p"].indexOf(name) !== -1) {
+    // If the stack of open elements does not have a p element
+    // in button scope, then this is a parse error;
+    // insert an HTML element for a "p" start tag token with no attributes.
+    if (!this.has_in_button_scope('p')) {
+      this.stack.push(name);
+      this.enqueue(name, ['open', Buffer('<p>')])
+    }
+    // Close a p element.
+    this.close_a_p_element();
+  }
+  // An end tag whose tag name is "li"
+  else if (token[0] === 'close'
+  && ["li"].indexOf(name) !== -1) {
+    console.log('in_body: ' + name + ' NOT IMPLEMENTED');
+  }
+  // An end tag whose tag name is one of: "dd", "dt"
+  else if (token[0] === 'close'
+  && ["dd", "dt"].indexOf(name) !== -1) {
+    console.log('in_body: ' + name + ' NOT IMPLEMENTED');
+  }
+  // An end tag whose tag name is one of: "h1", "h2", "h3", "h4",
+  // "h5", "h6"
+  else if (token[0] === 'close'
+  && ["dd", "dt"].indexOf(name) !== -1) {
+    console.log('in_body: ' + name + ' NOT IMPLEMENTED');
+  }
+  // A start tag whose tag name is "a"
+  else if (token[0] === 'open'
+  && ["a"].indexOf(name) !== -1) {
+    // If the list of active formatting elements contains an
+    // a element between the end of the list and the last marker
+    // on the list (or the start of the list if there is no marker on the list),
+    // then this is a parse error; run the adoption agency algorithm
+    // for the tag name "a", then remove that element from the
+    // list of active formatting elements and the stack of
+    // open elements if the adoption agency algorithm
+    // didn't already remove it
+    // (it might not have if the element is not in table scope).
+    marker = this.format.lastIndexOf(FMT_MARKER);
+    marker = marker < 0 ? 0 : marker;
+    idx = this.format.indexOf('a', marker);
+    if (idx !== -1) {
+      this.adoption_agency_algorithm(name);
+      // TODO: clarify what should be done here 
+    } 
+    
+    // Reconstruct the active formatting elements, if any.
+    this.reconstruct_formatting();
+
+    // Insert an HTML element for the token.
+    // Push onto the list of active formatting elements that element.
+    this.stack.push(name);
+    this.format.push(name);
+    this.enqueue(name, token);
+  }
+  // A start tag whose tag name is one of: "b", "big", "code", "em",
+  // "font", "i", "s", "small", "strike", "strong", "tt", "u"
   else if (token[0] === 'open'
   && ['b','big','code','em','font','i','s','small',
       'strike','strong','tt','u'].indexOf(name) !== -1) {
@@ -460,8 +670,8 @@ Nest.prototype.process_in_body = function(name, token) {
     // Insert an HTML element for the token.
     // Push onto the list of active formatting elements that element.
     this.stack.push(name);
-    this.enqueue(name, token);
     this.format.push(name);
+    this.enqueue(name, token);
   }
   // A start tag whose tag name is "nobr"
   else if (token[0] === 'open'
@@ -591,6 +801,58 @@ Nest.prototype.process_in_body = function(name, token) {
       this.frameset_ok = 'not ok';
     }
   }
+  // A start tag whose tag name is one of: "menuitem", "param",
+  // "source", "track"
+  else if (token[0] === 'open'
+  && ["menuitem", "param", "source", "track"].indexOf(name) !== -1) {
+    console.log('in_body: ' + name + ' NOT IMPLEMENTED');
+  }
+  // A start tag whose tag name is "hr"
+  else if (token[0] === 'open'
+  && ["hr"].indexOf(name) !== -1) {
+    // If the stack of open elements has a p element in button scope,
+    // then close a p element.
+    if (this.has_in_button_scope('p')) {
+      this.close_a_p_element();
+    }
+    // Insert an HTML element for the token.
+    // Immediately pop the current node off the stack of open elements.
+    this.enqueue(name, token);
+    // Acknowledge the token's self-closing flag, if it is set.
+    // Set the frameset-ok flag to "not ok".
+    this.frameset_ok = 'not ok';
+  }
+  // A start tag whose tag name is "image"
+  else if (token[0] === 'open'
+  && ["image"].indexOf(name) !== -1) {
+    console.log('in_body: ' + name + ' NOT IMPLEMENTED');
+  }
+  // A start tag whose tag name is "isindex"
+  else if (token[0] === 'open'
+  && ["isindex"].indexOf(name) !== -1) {
+    console.log('in_body: ' + name + ' NOT IMPLEMENTED');
+  }
+  // A start tag whose tag name is "textarea"
+  else if (token[0] === 'open'
+  && ["textarea"].indexOf(name) !== -1) {
+    console.log('in_body: ' + name + ' NOT IMPLEMENTED');
+  }
+  // A start tag whose tag name is "xmp"
+  else if (token[0] === 'open'
+  && ["xmp"].indexOf(name) !== -1) {
+    console.log('in_body: ' + name + ' NOT IMPLEMENTED');
+  }
+  // A start tag whose tag name is "iframe"
+  else if (token[0] === 'open'
+  && ["iframe"].indexOf(name) !== -1) {
+    console.log('in_body: ' + name + ' NOT IMPLEMENTED');
+  }
+  // A start tag whose tag name is "noembed"
+  // A start tag whose tag name is "noscript", if the scripting flag is enabled
+  else if ((token[0] === 'open' && name === 'noembed')
+  || (token[0] === 'open' && name === 'noscript' && this.scripting_flag)) {
+    console.log('in_body: ' + name + ' NOT IMPLEMENTED');
+  }
   // A start tag whose tag name is "select"
   else if (token[0] === 'open'
   && name === 'select') {
@@ -612,6 +874,37 @@ Nest.prototype.process_in_body = function(name, token) {
       this.insertion_mode = 'in_select';
     }
   }
+  // A start tag whose tag name is one of: "optgroup", "option"
+  else if (token[0] === 'open'
+  && ["optgroup", "option"].indexOf(name) !== -1) {
+    // If the current node is an option element,
+    // then pop the current node off the stack of open elements.
+    current_node = this.stack[this.stack.length-1];
+    if (current_node === 'option') {
+      this.stack.pop();
+      this.enqueue('option', ['close', Buffer('</option>')]);
+    }
+    // Reconstruct the active formatting elements, if any.
+    this.reconstruct_formatting();
+    // Insert an HTML element for the token.
+    this.stack.push(name);
+    this.enqueue(name, token);
+  }
+  // A start tag whose tag name is one of: "rp", "rt"
+  else if (token[0] === 'open'
+  && ["rp", "rt"].indexOf(name) !== -1) {
+    console.log('in_body: ' + name + ' NOT IMPLEMENTED');
+  }
+  // A start tag whose tag name is "math"
+  else if (token[0] === 'open'
+  && ["math"].indexOf(name) !== -1) {
+    console.log('in_body: ' + name + ' NOT IMPLEMENTED');
+  }
+  // A start tag whose tag name is "svg"
+  else if (token[0] === 'open'
+  && ["svg"].indexOf(name) !== -1) {
+    console.log('in_body: ' + name + ' NOT IMPLEMENTED');
+  }
   // A start tag whose tag name is one of: "caption", "col", "colgroup",
   // "frame", "head", "tbody", "td", "tfoot", "th", "thead", "tr"
   else if (token[0] === 'open'
@@ -627,7 +920,61 @@ Nest.prototype.process_in_body = function(name, token) {
     }
     this.enqueue(name, token);
   }
+  // Any other end tag
+  else if (token[0] === 'close') {
+    return this.process_in_body_any_other_end_tag(name);
+  }
   
+}
+
+Nest.prototype.process_in_body_any_other_end_tag = function(name) {
+  var node, node_sidx;
+  var current_node;
+  // 1. Initialise node to be the current node
+  // (the bottommost node of the stack).
+  node_sidx = this.stack.length;
+  while(node_sidx>0) {
+    node_sidx--;
+    node = this.stack[node_sidx];
+    // 2. Loop: If node is an HTML element with the same tag name
+    // as the token, then:
+    if (node === name) {
+      // 1. Generate implied end tags, except for HTML elements
+      // with the same tag name as the token.
+      this.generate_implied_end_tags_except_for(name);
+      // 2. If node is not the current node,
+      // then this is a parse error.
+      // 3. Pop all the nodes from the current node up to node,
+      // including node, then stop these steps.
+      do {
+        current_node = this.stack.pop();
+        this.enqueue(current_node, ['close', Buffer('</'+current_node+'>')])
+      } while (current_node !== node)
+      break;
+    } else {
+      // Otherwise, if node is in the special category,
+      // then this is a parse error; ignore the token,
+      // and abort these steps.
+      if (tags['special'].indexOf(node) !== -1) {
+        return;
+      }
+    }
+    // Set node to the previous entry in the stack of open elements.
+    // Return to the step labeled loop.
+  }
+}
+
+Nest.prototype.close_a_p_element = function() {
+  var node;
+  // 1. Generate implied end tags, except for p elements.
+  this.generate_implied_end_tags_except_for_p();
+  // 2. If the current node is not a p element, then this is a parse error.
+  // 3. Pop elements from the stack of open elements until
+  // a p element has been popped from the stack.
+  do {
+    node = this.stack.pop();
+    this.enqueue(node, ['close', Buffer('</'+node+'>')])
+  } while (node !== 'p');
 }
 
 // https://html.spec.whatwg.org/multipage/syntax.html#parsing-main-intable
@@ -869,6 +1216,23 @@ Nest.prototype.clear_the_stack_back_to_a_table_row_context = function() {
       this.enqueue(current_node, ['close', Buffer('</' + current_node + '>')]);
   }
   this.stack.push(current_node);
+}
+
+Nest.prototype.generate_implied_end_tags_except_for = function(name) {
+  var current_node;
+  var list = ['dd','dt','li','option','optgroup','p', 'rp','rt'];
+  list = list.filter(function(el) {
+    return el !== name;
+  })
+  while (list.indexOf(current_node = this.stack.pop()) !== -1) {
+    this.enqueue(current_node, ['close', Buffer('</' + current_node + '>')]);
+  }
+  this.stack.push(current_node);
+  return current_node;
+}
+
+Nest.prototype.generate_implied_end_tags_except_for_p = function() {
+  return this.generate_implied_end_tags_except_for('p');
 }
 Nest.prototype.generate_implied_end_tags = function() {
   var current_node;
@@ -1684,7 +2048,8 @@ Nest.prototype.process_xx_comment = function(name, token) {
 
   // try to see if we can exit comment mode
   if (token[0] === 'close'
-  && name === CLOSE_COMMENT) {
+  && (name === CLOSE_COMMENT1 || name === CLOSE_COMMENT2)) {
+    
     this.insertion_mode = this.insertion_mode_saved;
     this.insertion_mode_saved = null;
   }
@@ -1702,7 +2067,7 @@ Nest.prototype.process = function(token) {
     return false;
   }
 
-  //console.log(this.insertion_mode, token[0], token[1].toString(), 'fmt:'+this.format.join('/'));
+  console.log(this.insertion_mode, token[0], token[1].toString(), 'fmt:'+this.format.join('/'), 's:'+this.stack.join('/'));
   switch(this.insertion_mode) {
     case 'initial':
       reprocess = this.process_initial(name, token);
@@ -1812,7 +2177,7 @@ Nest.prototype.has_in_standard_scope = function(target) {
   // desc in the SVG namespace
   // title in the SVG namespace
 
-  // TODO: non HTML namespaces
+  // TODO: non HTML namespaces. Do not forget to update button_scope
   var stop = function(node) {
     return ['applet','caption','html','table','td','th','marquee',
             'object','template'].indexOf(node) !== -1;
@@ -1837,6 +2202,19 @@ Nest.prototype.has_in_table_scope = function(target) {
   }
   return this.has_in_specific_scope(target, stop);
 }
+Nest.prototype.has_in_button_scope = function(target) {
+  // The stack of open elements is said to have a particular element
+  // in button scope when it has that element in the specific scope
+  // consisting of the following element types:
+  // * All the element types listed above for the has an element in scope algorithm.
+  // * button in the HTML namespace
+  var stop = function(node) {
+    return ['applet','button','caption','html','table','td','th','marquee',
+            'object','template'].indexOf(node) !== -1;
+  }
+  return this.has_in_specific_scope(target, stop);
+}
+
 Nest.prototype.has_in_specific_scope = function(target, stop) {
   // 1. Initialise node to be the current node (the bottommost node of the stack).
   var node_sidx = this.stack.length;
@@ -1968,12 +2346,13 @@ Nest.prototype.adoption_agency_algorithm = function(name) {
     var last_marker_idx = this.format.lastIndexOf(FMT_MARKER);
     var formatting_element_idx = this.format.lastIndexOf(name)
     if (formatting_element_idx <= last_marker_idx) {
-      // abort these steps and instead act as described in the "any other end tag" entry above.
-      // TODO: goto "any other end tag"
-      return
+      // abort these steps and instead act as described
+      // in the "any other end tag" entry above.
+      return this.process_in_body_any_other_end_tag(name)
     }
 
-    // 6. If formatting element is not in the stack of open elements, then this is a parse error;
+    // 6. If formatting element is not in the stack of open elements,
+    // then this is a parse error;
     // remove the element from the list, and abort these steps.
     var formatting_element = this.format[formatting_element_idx];
     if (this.stack.indexOf(formatting_element) === -1) {
@@ -1981,15 +2360,21 @@ Nest.prototype.adoption_agency_algorithm = function(name) {
       return;
     }
 
-    // 7. If formatting element is in the stack of open elements, but the element is not in scope,
+    // 7. If formatting element is in the stack of open elements,
+    // but the element is not in scope,
     // then this is a parse error; abort these steps.
-    // TODO: clarify the "scope" evaluation
+    if (this.has_in_scope(formatting_element)
+    && !this.has_in_standard_scope(formatting_element)) {
+      return;
+    }
 
     // 8. If formatting element is not the current node, this is a parse error.
     // (But do not abort these steps.)    
 
-    // 9. Let furthest block be the topmost node in the stack of open elements that is lower in the stack
-    // than formatting element, and is an element in the special category. There might not be one.
+    // 9. Let furthest block be the topmost node in the stack
+    // of open elements that is lower in the stack
+    // than formatting element, and is an element in the special category.
+    // There might not be one.
     var fe_stack_idx = this.stack.lastIndexOf(formatting_element);
     var furthest_block = null;
     var furthest_block_idx = -1;
@@ -2001,9 +2386,12 @@ Nest.prototype.adoption_agency_algorithm = function(name) {
       }
     }
     
-    // 10. If there is no furthest block, then the UA must first pop all the nodes from the bottom of the
-    // stack of open elements, from the current node up to and including formatting element, then remove
-    // formatting element from the list of active formatting elements, and finally abort these steps.
+    // 10. If there is no furthest block, then the UA must first
+    // pop all the nodes from the bottom of the
+    // stack of open elements, from the current node up to and
+    // including formatting element, then remove
+    // formatting element from the list of active formatting elements,
+    // and finally abort these steps.
     if (!furthest_block) {
       do {
         var current_node = this.stack.pop();
@@ -2041,21 +2429,24 @@ Nest.prototype.adoption_agency_algorithm = function(name) {
       node_sidx--;
       node = this.stack[node_sidx];
 
-      // 13.4. If node is formatting element, then go to the next step in the overall algorithm.
+      // 13.4. If node is formatting element, then go to the next step
+      // in the overall algorithm.
       if (tags['formatting'].indexOf(node) !== -1) {
         break;
       }
 
       // 13.5. If inner loop counter is greater than three and node is in the list of
-      // active formatting elements, then remove node from the list of active formatting elements.
+      // active formatting elements, then remove node from the list of
+      // active formatting elements.
       if (inner_loop_counter > 3
       && this.format.indexOf(node) !== -1) {
         var tmp_fidx = this.format.indexOf(node);
         this.format.splice(tmp_fidx, 1);
       }
 
-      // 13.6. If node is not in the list of active formatting elements, then remove node from
-      // the stack of open elements and then go back to the step labeled inner loop.
+      // 13.6. If node is not in the list of active formatting elements,
+      // then remove node from the stack of open elements and then go
+      // back to the step labeled inner loop.
       if (this.format.indexOf(node) === -1) {
         this.stack.splice(node_sidx, 1);
         continue;
@@ -2066,16 +2457,21 @@ Nest.prototype.adoption_agency_algorithm = function(name) {
       // replace the entry for node in the list of active formatting elements with an entry
       // for the new element, replace the entry for node in the stack of open elements
       // with an entry for the new element, and let node be the new element.
-
+      
+      console.log("ADOPTION", "13.7")
       // TO BE CONTINUED WITH AN EXAMPLE...
     }
 
     // 14. Insert whatever last node ended up being in the previous step
-    // at the appropriate place for inserting a node, but using common ancestor as the override target.
+    // at the appropriate place for inserting a node,
+    // but using common ancestor as the override target.
 
-    // TODO: remove 'no comment' simplification (open tag problem)
+    // TODO: what about 'comment' nodes
     // body > b > p
     // maybe remember / associate buffer freeze with stack position
+    this.buffer.forEach(function(b) {
+      console.log('BUF', b[0], b[1].toString());
+    })
     var node_bidx=0;
     var open_target = last_node_sidx - node_sidx + 1;
     var open_cur = 0;
@@ -2128,7 +2524,7 @@ Nest.prototype.adoption_agency_algorithm = function(name) {
 Nest.prototype.enqueue = function(name, token) {
 
   var buf, tok;
-
+  console.log('ENQUEUE', name, token[1].toString())
   // adapt seqs
   if (token[0] === 'close'
   && name === 'head') {

@@ -5,7 +5,7 @@ var tokenize = require('html-tokenize');
 var nest = require('../');
 var parse_tag = require('../parse_tag.js')
 
-var dat = fs.createReadStream(__dirname + '/html5lib-tests/tree-construction/tests7.dat');
+var dat = fs.createReadStream(__dirname + '/html5lib-tests/tree-construction/tests1.dat');
 
 var left;
 var liner = through(function(row, enc, next) {
@@ -77,7 +77,7 @@ var parser = through(function(row, enc, next) {
 
 var velements = [ 'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'keygen', 'link', 'menuitem', 'meta', 'param', 'source', 'track', 'wbr'];
 var num = 0;
-var limit = 40
+var limit = 30
 function addTest(desc) {
   num++;
   if (num > limit) return;
@@ -109,6 +109,7 @@ function addTest(desc) {
     var more_text = false;
     var pending_text = '';
     var exp;
+    var text_state = 'text';
     tok.pipe(n).pipe(through.obj(function(row,_,next) {
       if (more_text) {
         //t.equal(row[0], 'text', 'more text');
@@ -121,7 +122,12 @@ function addTest(desc) {
       var act_name = row[1].toString();
       var id_attrs = true;
       var tt;
-      if (row[0] === 'open') {
+      console.log('RCVD:', row[1].toString())
+      if (row[0] === 'open' && row[1].toString() === '<!--') {
+        tt = (act_name === exp_name);
+        text_state = 'comment';
+      }
+      else if (row[0] === 'open') {
         var exp_tag = parse_tag(exp[1]);
         var act_tag = parse_tag(row[1]);
         var exp_attr = exp_tag.getAttributes();
@@ -136,8 +142,16 @@ function addTest(desc) {
         act_name = act_tag.name.toLowerCase();
         tt = id_attrs && (act_name === exp_name);
       }
+      else if (row[0] === 'close' && text_state === 'comment') {
+        tt = (act_name === '>' || act_name === '')
+        && (exp_name === '-->')
+        text_state = 'text';
+      }
       else if (row[0] === 'close') {
         tt = (act_name === exp_name);
+      }
+      else if (text_state === 'comment') {
+        tt = exp_name.trim() === act_name.trim();
       } 
       else {
         pending_text += act_name;
@@ -173,6 +187,11 @@ function getTokens(doc) {
     }
     if (line.toLowerCase().substr(0,9) === '<!doctype') {
       tokens.push(['open', line.toLowerCase()])
+    }
+    else if (line.substr(0,4) === '<!--') {
+      tokens.push(['open', '<!--'])
+      tokens.push(['text', line.substr(4, line.length-7)])
+      tokens.push(['close', '-->'])
     }
     else if (line.substr(0,1) === '<') {
       while (pos < stack.length) {
